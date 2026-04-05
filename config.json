@@ -1,0 +1,28 @@
+{
+  "platforms": {
+    "facebook": {
+      "limit": 3000
+    },
+    "telegram": {
+      "limit": 1024
+    },
+    "threads": {
+      "limit": 500
+    },
+    "tumblr": {
+      "limit": 2000
+    },
+    "discord": {
+      "limit": 2000
+    }
+  },
+  "dropbox": {
+    "folder": "/dropbox",
+    "failed_folder": "/dropbox_failed"
+  },
+  "settings": {
+    "post_delay": 10,
+    "retry_count": 3,
+    "fixed_hashtag": "#BoyishLife"
+  }
+}
