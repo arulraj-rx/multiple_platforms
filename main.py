@@ -156,7 +156,7 @@ def main():
     logger.info("UNIVERSAL ROTATING WORKFLOW STARTED")
     logger.info("=" * 50)
 
-    with open("your_config.json", "r", encoding="utf-8-sig") as config_file:
+    with open("config.json", "r", encoding="utf-8-sig") as config_file:
         config = json.load(config_file)
 
     settings = config.get("settings", {})
