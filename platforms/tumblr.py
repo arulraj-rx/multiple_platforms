@@ -1,6 +1,7 @@
 ﻿import os
 import time
 import logging
+import re
 import pytumblr
 from typing import Tuple, Union
 
@@ -20,22 +21,46 @@ class TumblrPoster:
             os.getenv("TUMBLR_OAUTH_TOKEN_SECRET"),
         )
 
-    def _extract_data(self, caption_data: Union[str, dict]) -> Tuple[str, list]:
+    def _normalize_tags(self, raw_tags) -> str:
+        if isinstance(raw_tags, str):
+            raw_tags = raw_tags.split(",") if "," in raw_tags else raw_tags.split()
+        elif not isinstance(raw_tags, list):
+            raw_tags = []
+
+        cleaned_tags = []
+        seen = set()
+
+        for raw_tag in raw_tags:
+            normalized = str(raw_tag).strip().lstrip("#").strip()
+            if not normalized:
+                continue
+            if normalized.lower() in seen:
+                continue
+            seen.add(normalized.lower())
+            cleaned_tags.append(normalized)
+
+        return ",".join(cleaned_tags)
+
+    def _extract_inline_tags(self, text: str) -> Tuple[str, str]:
+        matches = re.findall(r"#([A-Za-z0-9_]+)", text)
+        cleaned_text = re.sub(r"\s*#([A-Za-z0-9_]+)", "", text).strip()
+        return cleaned_text or text.strip(), self._normalize_tags(matches)
+
+    def _extract_data(self, caption_data: Union[str, dict]) -> Tuple[str, str]:
         if isinstance(caption_data, dict):
             text = str(caption_data.get("text", "")).strip()
             ai_tags = caption_data.get("tags", [])
             brand_tag = caption_data.get("brand_tag", "")
 
-            if not isinstance(ai_tags, list):
-                ai_tags = []
-
-            cleaned_tags = [tag for tag in ai_tags if tag]
+            merged_tags = ai_tags if isinstance(ai_tags, list) else [ai_tags]
             if brand_tag:
-                cleaned_tags.append(str(brand_tag).replace("#", "").strip())
+                merged_tags.append(brand_tag)
 
-            return text or "New Post", cleaned_tags
+            return text or "New Post", self._normalize_tags(merged_tags)
 
-        return str(caption_data), []
+        text = str(caption_data).strip()
+        clean_text, tag_string = self._extract_inline_tags(text)
+        return clean_text, tag_string
 
     def _poll_post(self, post_id):
         if not post_id:
@@ -77,9 +102,11 @@ class TumblrPoster:
         return self._poll_post(response.get("id"))
 
     def post_text(self, text: str) -> bool:
+        body_text, tag_str = self._extract_data(text)
         response = self.client.create_text(
             self.blog_name,
             state="published",
-            body=text,
+            body=body_text,
+            tags=tag_str,
         )
         return self._poll_post(response.get("id"))
