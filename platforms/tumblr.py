@@ -23,7 +23,7 @@ class TumblrPoster:
 
     def _normalize_tags(self, raw_tags) -> str:
         if isinstance(raw_tags, str):
-            raw_tags = raw_tags.split(",") if "," in raw_tags else raw_tags.split()
+            raw_tags = [raw_tags]
         elif not isinstance(raw_tags, list):
             raw_tags = []
 
@@ -31,15 +31,25 @@ class TumblrPoster:
         seen = set()
 
         for raw_tag in raw_tags:
-            normalized = str(raw_tag).strip().lstrip("#").strip()
-            if not normalized:
+            text = str(raw_tag).strip()
+            if not text:
                 continue
-            if normalized.lower() in seen:
-                continue
-            seen.add(normalized.lower())
-            cleaned_tags.append(normalized)
 
-        return ",".join(cleaned_tags)
+            parts = re.split(r"[\s,]+", text)
+            for part in parts:
+                normalized = part.strip().lstrip("#").strip(".,!?:;()[]{}\"'")
+                if not normalized:
+                    continue
+                if len(normalized) <= 1:
+                    continue
+                if normalized.lower() in seen:
+                    continue
+                seen.add(normalized.lower())
+                cleaned_tags.append(normalized)
+
+        tag_string = ",".join(cleaned_tags)
+        self.logger.info(f"   Tumblr tags prepared: {tag_string or 'none'}")
+        return tag_string
 
     def _extract_inline_tags(self, text: str) -> Tuple[str, str]:
         matches = re.findall(r"#([A-Za-z0-9_]+)", text)
@@ -52,11 +62,14 @@ class TumblrPoster:
             ai_tags = caption_data.get("tags", [])
             brand_tag = caption_data.get("brand_tag", "")
 
+            inline_text, inline_tags = self._extract_inline_tags(text)
             merged_tags = ai_tags if isinstance(ai_tags, list) else [ai_tags]
+            if inline_tags:
+                merged_tags.extend(inline_tags.split(","))
             if brand_tag:
                 merged_tags.append(brand_tag)
 
-            return text or "New Post", self._normalize_tags(merged_tags)
+            return inline_text or "New Post", self._normalize_tags(merged_tags)
 
         text = str(caption_data).strip()
         clean_text, tag_string = self._extract_inline_tags(text)
