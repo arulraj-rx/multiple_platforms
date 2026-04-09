@@ -84,7 +84,7 @@ def safe_post(platform_name, platform_obj, method_name, args, retry_engine,
             return False
 
     try:
-        logger.info(f"{platform_name.upper()} uploading...")
+        logger.info(f"{platform_name.upper()} starting publish")
         method = getattr(platform_obj, method_name)
         result = retry_engine.execute(method, *args)
 
@@ -159,14 +159,16 @@ def main():
     with open("config.json", "r", encoding="utf-8") as config_file:
         config = json.load(config_file)
 
+    settings = config.get("settings", {})
     dbx = DropboxHandler(config["dropbox"])
     ai = CaptionGenerator(config)
     p_conf = config["platforms"]
 
     retry_engine = SmartRetry(
-        max_attempts=config["settings"].get("retry_count", 3)
+        max_attempts=settings.get("retry_count", 3),
+        retry_delay=settings.get("retry_delay", 20),
     )
-    delay = config["settings"].get("post_delay", 10)
+    delay = settings.get("post_delay", 10)
 
     mapping = {
         "facebook": FacebookPoster,
@@ -178,7 +180,7 @@ def main():
 
     total_platforms = len(mapping)
     platforms = {
-        name: cls()
+        name: cls(settings)
         for name, cls in mapping.items()
         if name in p_conf
     }
@@ -188,7 +190,7 @@ def main():
     if not file_metadata or not enabled_names:
         print_final_summary(enabled_names, total_platforms, dbx)
 
-    logger.info(f"\nProcessing FILE -> {file_metadata.name}")
+    logger.info(f"Processing FILE -> {file_metadata.name}")
     file_type = detect_file_type(file_metadata.name)
 
     if not file_type:
@@ -202,30 +204,27 @@ def main():
         dbx.move_to_failed(file_metadata)
         print_final_summary(enabled_names, total_platforms, dbx)
 
-    file_failed = False
+    failed_platforms = []
 
     if file_type == "text":
         text_content = read_text_file(local_path)
         if not text_content:
             logger.warning("Text file is empty")
-            file_failed = True
-
-        for platform_name in enabled_names:
-            limit = p_conf[platform_name].get("limit", 2000)
-            final_text = safe_trim_caption(text_content, limit)
-
-            result = safe_post(
-                platform_name,
-                platforms[platform_name],
-                "post_text",
-                (final_text,),
-                retry_engine,
-            )
-
-            if not result:
-                file_failed = True
-
-            time.sleep(delay)
+            failed_platforms = enabled_names[:]
+        else:
+            for platform_name in enabled_names:
+                limit = p_conf[platform_name].get("limit", 2000)
+                final_text = safe_trim_caption(text_content, limit)
+                result = safe_post(
+                    platform_name,
+                    platforms[platform_name],
+                    "post_text",
+                    (final_text,),
+                    retry_engine,
+                )
+                if not result:
+                    failed_platforms.append(platform_name)
+                time.sleep(delay)
     else:
         caption_payload = ai.generate(file_metadata.name, file_type)
         public_url = dbx.get_temp_link(file_metadata) if file_type in {"image", "video"} else None
@@ -251,21 +250,20 @@ def main():
                 local_path=local_path,
                 media_type=file_type,
             )
-
             if not result:
-                file_failed = True
-
+                failed_platforms.append(platform_name)
             time.sleep(delay)
 
     if os.path.exists(local_path):
         os.remove(local_path)
 
-    if not file_failed:
+    if failed_platforms:
+        logger.warning(f"Failed platforms for {file_metadata.name}: {', '.join(failed_platforms)}")
+        dbx.move_to_failed(file_metadata, failed_platforms)
+        logger.warning("File copied to platform-specific failed folders")
+    else:
         dbx.delete_file(file_metadata)
         logger.info("Dropbox file deleted (all targets success)")
-    else:
-        dbx.move_to_failed(file_metadata)
-        logger.warning("File moved to failed folder due to upload failures")
 
     print_final_summary(enabled_names, total_platforms, dbx)
 

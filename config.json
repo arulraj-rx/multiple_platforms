@@ -1,4 +1,4 @@
-{
+﻿{
   "platforms": {
     "facebook": {
       "limit": 3000
@@ -23,6 +23,9 @@
   "settings": {
     "post_delay": 10,
     "retry_count": 3,
+    "retry_delay": 20,
+    "poll_interval": 20,
+    "poll_attempts": 3,
     "fixed_hashtag": "#BoyishLife"
   }
 }
