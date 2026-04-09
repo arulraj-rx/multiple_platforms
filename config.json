@@ -17,8 +17,8 @@
     }
   },
   "dropbox": {
-    "folder": "/dropbox",
-    "failed_folder": "/dropbox_failed"
+    "folder": "/facebook",
+    "failed_folder": "/failed"
   },
   "settings": {
     "post_delay": 10,
@@ -26,6 +26,6 @@
     "retry_delay": 20,
     "poll_interval": 20,
     "poll_attempts": 3,
-    "fixed_hashtag": "#BoyishLife"
+    "fixed_hashtag": "#arul9x"
   }
 }
