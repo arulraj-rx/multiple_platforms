@@ -85,7 +85,7 @@ class DropboxHandler:
         actual_type = self.detect_media_type(selected.name)
         
         self.logger.info(
-            f"Selected {selected_type}: {selected.name} | "
+            f"Selected {actual_type}: {selected.name} | "
             f"I={len(images)}, V={len(videos)}, T={len(texts)}"
         )
 
