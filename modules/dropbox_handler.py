@@ -67,7 +67,7 @@ class DropboxHandler:
 
         # 🎯 CHANGE RATIO HERE
         types = ["image", "video", "text"]
-        weights = [40, 40, 20]
+        weights = [41, 39, 20]
 
         selected_type = random.choices(types, weights=weights)[0]
 
