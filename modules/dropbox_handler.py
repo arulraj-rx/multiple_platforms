@@ -1,7 +1,6 @@
 import logging
 import os
 import random
-
 import dropbox
 from dropbox.exceptions import ApiError
 
@@ -16,7 +15,6 @@ class DropboxHandler:
         self.conf = config
         self.client = None
 
-    # ✅ Dropbox client
     def _get_client(self):
         if self.client is None:
             self.client = dropbox.Dropbox(
@@ -28,7 +26,7 @@ class DropboxHandler:
             self.logger.info("Dropbox client initialized")
         return self.client
 
-    # ✅ Detect file type
+    # ✅ detect type
     def detect_media_type(self, filename):
         ext = os.path.splitext(filename)[1].lower()
 
@@ -41,11 +39,10 @@ class DropboxHandler:
 
         return None
 
-    # ✅ MAIN: weighted selection
+    # ✅ UPDATED: weighted file selection
     def get_file(self):
         path = self.conf.get("folder")
         if not path:
-            self.logger.warning("No folder path configured")
             return None
 
         files = self._list_files(path)
@@ -54,7 +51,6 @@ class DropboxHandler:
         videos = []
         texts = []
 
-        # classify files
         for entry in files:
             media_type = self.detect_media_type(entry.name)
 
@@ -66,12 +62,12 @@ class DropboxHandler:
                 texts.append(entry)
 
         if not images and not videos and not texts:
-            self.logger.warning("No valid media/text files found")
+            self.logger.warning("No valid files found")
             return None
 
-        # 🎯 CHANGE WEIGHTS HERE anytime
+        # 🎯 CHANGE RATIO HERE
         types = ["image", "video", "text"]
-        weights = [41, 39, 20]
+        weights = [40, 40, 20]
 
         selected_type = random.choices(types, weights=weights)[0]
 
@@ -82,29 +78,26 @@ class DropboxHandler:
         elif selected_type == "text" and texts:
             selected = random.choice(texts)
         else:
-            # fallback if chosen type empty
+            # fallback
             selected = random.choice(images or videos or texts)
             selected_type = self.detect_media_type(selected.name)
 
         self.logger.info(
             f"Selected {selected_type}: {selected.name} | "
-            f"Images={len(images)}, Videos={len(videos)}, Texts={len(texts)}"
+            f"I={len(images)}, V={len(videos)}, T={len(texts)}"
         )
 
         return selected
 
-    # ✅ Folder stats
     def get_folder_stats(self):
         inbox_files = self._list_files(self.conf.get("folder", ""))
         failed_files = self._list_files(self.conf.get("failed_folder", ""), recursive=True)
-
         return {
             "pending": len(inbox_files),
             "failed": len(failed_files),
             "total": len(inbox_files) + len(failed_files),
         }
 
-    # ✅ List files
     def _list_files(self, path, recursive=False):
         if not path:
             return []
@@ -114,14 +107,16 @@ class DropboxHandler:
             results = client.files_list_folder(path, recursive=recursive)
 
             files = [
-                entry for entry in results.entries
+                entry
+                for entry in results.entries
                 if isinstance(entry, dropbox.files.FileMetadata)
             ]
 
             while results.has_more:
                 results = client.files_list_folder_continue(results.cursor)
                 files.extend(
-                    entry for entry in results.entries
+                    entry
+                    for entry in results.entries
                     if isinstance(entry, dropbox.files.FileMetadata)
                 )
 
@@ -131,39 +126,32 @@ class DropboxHandler:
             self.logger.error(f"Dropbox list error ({path}): {exc}")
             return []
 
-    # ✅ Download
     def download_file(self, file_metadata):
         try:
             client = self._get_client()
-            local_path = os.path.abspath(f"temp_{file_metadata.name}")
+            local_path = f"temp_{file_metadata.name}"
             client.files_download_to_file(local_path, file_metadata.path_lower)
             return local_path
-
         except Exception as exc:
             self.logger.error(f"Download failed: {exc}")
             return None
 
-    # ✅ Temp link
     def get_temp_link(self, file_metadata):
         try:
             client = self._get_client()
             return client.files_get_temporary_link(file_metadata.path_lower).link
-
         except Exception as exc:
             self.logger.error(f"Temp link failed: {exc}")
             return None
 
-    # ✅ Delete
     def delete_file(self, file_metadata):
         try:
             client = self._get_client()
             client.files_delete_v2(file_metadata.path_lower)
             self.logger.info(f"Deleted {file_metadata.name} from Dropbox")
-
         except Exception as exc:
             self.logger.error(f"Delete failed: {exc}")
 
-    # ✅ Ensure folder
     def _ensure_folder(self, path):
         client = self._get_client()
         try:
@@ -173,13 +161,12 @@ class DropboxHandler:
                 return
             raise
 
-    # ✅ Move to failed
     def move_to_failed(self, file_metadata, platform_names=None):
         client = self._get_client()
         failed_root = self.conf.get("failed_folder", "/failed")
 
         targets = platform_names or ["unclassified"]
-        targets = [str(t).strip().lower() for t in targets if str(t).strip()]
+        targets = [str(target).strip().lower() for target in targets if str(target).strip()]
         targets = list(dict.fromkeys(targets))
 
         try:
@@ -200,7 +187,7 @@ class DropboxHandler:
                 self.logger.warning(f"Copied failed file to {destination}")
 
             client.files_delete_v2(file_metadata.path_lower)
-            self.logger.warning(f"Removed original file: {file_metadata.name}")
+            self.logger.warning(f"Removed source file: {file_metadata.name}")
 
         except Exception as exc:
             self.logger.error(f"Move to failed error: {exc}")
