@@ -81,7 +81,9 @@ class DropboxHandler:
             # fallback
             selected = random.choice(images or videos or texts)
             selected_type = self.detect_media_type(selected.name)
-
+        
+        actual_type = self.detect_media_type(selected.name)
+        
         self.logger.info(
             f"Selected {selected_type}: {selected.name} | "
             f"I={len(images)}, V={len(videos)}, T={len(texts)}"
