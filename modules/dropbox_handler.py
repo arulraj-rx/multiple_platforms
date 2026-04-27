@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+from collections import Counter
 import dropbox
 from dropbox.exceptions import ApiError
 
@@ -98,6 +99,49 @@ class DropboxHandler:
             "pending": len(inbox_files),
             "failed": len(failed_files),
             "total": len(inbox_files) + len(failed_files),
+        }
+
+    def get_failed_platform_stats(self, platform_names=None):
+        failed_root = self.conf.get("failed_folder", "/failed")
+        normalized = []
+
+        for name in platform_names or []:
+            value = str(name).strip().lower()
+            if value and value not in normalized:
+                normalized.append(value)
+
+        per_platform = {}
+        filename_sets = []
+        filename_counter = Counter()
+
+        for platform_name in normalized:
+            failed_path = f"{failed_root}/{platform_name}"
+            files = self._list_files(failed_path, recursive=True)
+            names = sorted({entry.name for entry in files})
+
+            per_platform[platform_name] = {
+                "count": len(files),
+                "files": names,
+            }
+            filename_sets.append(set(names))
+            filename_counter.update(names)
+
+        common_files = (
+            sorted(set.intersection(*filename_sets))
+            if filename_sets else []
+        )
+        shared_files = {
+            name: count
+            for name, count in sorted(filename_counter.items())
+            if count > 1
+        }
+
+        return {
+            "per_platform": per_platform,
+            "common_files": common_files,
+            "common_count": len(common_files),
+            "shared_files": shared_files,
+            "filename_occurrences": dict(sorted(filename_counter.items())),
         }
 
     def _list_files(self, path, recursive=False):
