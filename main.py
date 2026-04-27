@@ -251,7 +251,7 @@ def main():
                 time.sleep(delay)
     else:
         caption_payload = ai.generate(file_metadata.name, file_type)
-        public_url = dbx.get_temp_link(file_metadata) if file_type in {"image", "video"} else None
+        public_url = dbx.get_public_media_url(file_metadata) if file_type in {"image", "video"} else None
 
         for platform_name in enabled_names:
             method_name = "post_video" if file_type == "video" else "post_image"
