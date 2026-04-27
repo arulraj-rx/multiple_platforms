@@ -13,7 +13,17 @@ class ErrorClassifier:
         # 2. MEDIA ERRORS (Skip File)
         # 413: File too large, 415: Bad format, 422: Processing error
         media_codes = [413, 415, 422]
-        media_triggers = ["payload too large", "unsupported media", "aspect ratio", "invalid format"]
+        media_triggers = [
+            "payload too large",
+            "unsupported media",
+            "aspect ratio",
+            "invalid format",
+            "media download has failed",
+            "media uri doesn't meet our requirements",
+            "the media could not be fetched from this uri",
+            "failed_downloading_video",
+            "failed_processing_video",
+        ]
         if code in media_codes or any(x in msg for x in media_triggers):
             return "SKIP"
 
