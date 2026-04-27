@@ -2,6 +2,7 @@ import logging
 import os
 import random
 from collections import Counter
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 import dropbox
 from dropbox.exceptions import ApiError
 
@@ -189,6 +190,36 @@ class DropboxHandler:
         except Exception as exc:
             self.logger.error(f"Temp link failed: {exc}")
             return None
+
+    @staticmethod
+    def _to_direct_shared_media_url(url):
+        parsed = urlparse(url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query.pop("dl", None)
+        query["raw"] = "1"
+        return urlunparse(parsed._replace(query=urlencode(query)))
+
+    def get_public_media_url(self, file_metadata):
+        try:
+            client = self._get_client()
+            links = client.sharing_list_shared_links(
+                path=file_metadata.path_lower,
+                direct_only=True,
+            ).links
+
+            if links:
+                shared_url = links[0].url
+            else:
+                shared_url = client.sharing_create_shared_link_with_settings(
+                    file_metadata.path_lower
+                ).url
+
+            direct_url = self._to_direct_shared_media_url(shared_url)
+            self.logger.info(f"Using Dropbox shared media URL for {file_metadata.name}")
+            return direct_url
+        except Exception as exc:
+            self.logger.warning(f"Shared media URL failed for {file_metadata.name}: {exc}")
+            return self.get_temp_link(file_metadata)
 
     def delete_file(self, file_metadata):
         try:
