@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import time
 import sys
@@ -112,6 +112,7 @@ def print_final_summary(enabled_platforms, total_platforms, dbx):
     total_failed = sum(d["failed"] for d in PLATFORM_RESULTS.values())
     total_skipped = sum(d["skipped"] for d in PLATFORM_RESULTS.values())
     dropbox_stats = dbx.get_folder_stats()
+    failed_stats = dbx.get_failed_platform_stats(enabled_platforms)
 
     summary_lines = []
     summary_lines.append("=" * 60)
@@ -141,6 +142,29 @@ def print_final_summary(enabled_platforms, total_platforms, dbx):
     summary_lines.append(f"Failed          : {dropbox_stats['failed']}")
     summary_lines.append("-" * 60)
     summary_lines.append(f"TOTAL FILES     : {dropbox_stats['total']}")
+    summary_lines.append("=" * 60)
+    summary_lines.append("FAILED FOLDER PLATFORM BREAKDOWN")
+    summary_lines.append("-" * 60)
+
+    for name in enabled_platforms:
+        data = failed_stats["per_platform"].get(name, {"count": 0, "files": []})
+        summary_lines.append(f"{name.upper():10} -> Failed Files: {data['count']}")
+
+    summary_lines.append("-" * 60)
+    summary_lines.append(
+        f"Common Files Across Enabled Failed Folders: {failed_stats['common_count']}"
+    )
+
+    if failed_stats["common_files"]:
+        summary_lines.append("Common File Names:")
+        for filename in failed_stats["common_files"]:
+            summary_lines.append(f" - {filename}")
+
+    if failed_stats["shared_files"]:
+        summary_lines.append("-" * 60)
+        summary_lines.append("Files Present In Multiple Failed Platform Folders:")
+        for filename, count in failed_stats["shared_files"].items():
+            summary_lines.append(f" - {filename} -> {count} folders")
     summary_lines.append("=" * 60)
 
     logger.info("\n" + "\n".join(summary_lines))
@@ -195,13 +219,13 @@ def main():
 
     if not file_type:
         logger.warning(f"Unsupported file type: {file_metadata.name}")
-        dbx.move_to_failed(file_metadata)
+        dbx.move_to_failed(file_metadata, enabled_names)
         print_final_summary(enabled_names, total_platforms, dbx)
 
     local_path = dbx.download_file(file_metadata)
     if not local_path:
         logger.error("Download failed, moving file to failed folder")
-        dbx.move_to_failed(file_metadata)
+        dbx.move_to_failed(file_metadata, enabled_names)
         print_final_summary(enabled_names, total_platforms, dbx)
 
     failed_platforms = []
