@@ -7,7 +7,6 @@ class MediaVerifier:
         'discord':   {'image': 10,  'video': 10},   # Recent 2026 adjustment
         'facebook':  {'image': 30,  'video': 1024}, # Large video support, 30MB images
         'telegram':  {'image': 10,  'video': 50},   # Bot API limit is 50MB for videos
-        'threads':   {'image': 8,   'video': 1024}, # 8MB JPEG limit, 1GB video
         'tumblr':    {'image': 10,  'video': 100}   # Conservative 10MB/100MB limits
     }
 
